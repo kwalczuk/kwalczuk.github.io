@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chicago Daily Ops Report</title>
+<style>
+  :root { --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #5f6b7a; --line: #dde1e7; --accent: #1f4e78; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1d2128; --text: #e7eaef; --muted: #9aa4b2; --line: #2d333d; --accent: #6ea8de; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1400px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  #updated { margin: 4px 0 0; color: var(--muted); }
+  #updated b { color: var(--text); font-weight: 600; }
+  main { max-width: 1400px; margin: 0 auto; padding: 8px 16px 32px; display: grid; gap: 16px; }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  figcaption { padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+  figcaption a { color: var(--accent); font-weight: 400; text-decoration: none; }
+  figure img { display: block; max-width: 100%; height: auto; margin: 0 auto; background: #fff; }
+  .missing { padding: 40px 14px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Chicago Daily Ops Report</h1>
+  <p id="updated">Loading&hellip;</p>
+</header>
+<main>
+  <figure>
+    <figcaption>Summary <a id="sumLink" href="images/summary.png" target="_blank" rel="noopener">open full size</a></figcaption>
+    <img id="sumImg" alt="Daily Ops Summary">
+  </figure>
+  <figure>
+    <figcaption>All shops <a id="shopLink" href="images/all-shops.png" target="_blank" rel="noopener">open full size</a></figcaption>
+    <img id="shopImg" alt="Daily Ops All shops">
+  </figure>
+</main>
+<script>
+  // updated.json is written by DailyOps.ps1 each time it publishes: {"updated": "...", "report": "yyyy-mm-dd"}
+  const TZ = 'America/Chicago';
+  let shown = null;
+
+  function show(img, link, src, stamp) {
+    const url = src + '?v=' + encodeURIComponent(stamp);         // new pictures every update, no stale cache
+    img.onerror = () => { img.replaceWith(Object.assign(document.createElement('div'), { className: 'missing', textContent: 'Picture not published yet.' })); };
+    img.src = url; link.href = url;
+  }
+
+  async function load() {
+    let info = null;
+    try {
+      const r = await fetch('updated.json?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) info = await r.json();
+    } catch (e) { }
+    const p = document.getElementById('updated');
+    if (!info || !info.updated) { p.textContent = 'Not published yet.'; return; }
+    if (info.updated === shown) return;                         // nothing new
+    shown = info.updated;
+    const d = new Date(info.updated);
+    const date = d.toLocaleDateString('en-US', { timeZone: TZ, weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const time = d.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
+    let report = '';
+    if (info.report) {
+      const [y, m, dd] = info.report.split('-').map(Number);
+      report = ' &middot; report date ' + new Date(y, m - 1, dd).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+    }
+    p.innerHTML = 'Last updated on <b>' + date + ', ' + time + '</b>' + report;
+    show(document.getElementById('sumImg'), document.getElementById('sumLink'), 'images/summary.png', info.updated);
+    show(document.getElementById('shopImg'), document.getElementById('shopLink'), 'images/all-shops.png', info.updated);
+  }
+
+  load();
+  setInterval(load, 5 * 60 * 1000);                             // pick up a new update without reloading
+</script>
+</body>
+</html>
